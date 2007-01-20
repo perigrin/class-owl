@@ -32,8 +32,7 @@ my %CONFIG = (
 
 our %class;
 
-
-sub debug($) { print STDERR shift, "\n" }
+sub debug($) { print STDERR @_, "\n" }
 
 sub _get_helper { return RDF::Helper->new(%CONFIG); }
 
@@ -58,6 +57,7 @@ sub parse_url {
 
 sub parse_rdfxml {
 	my ($self, $rdfxml) = @_;
+	debug $rdfxml;
 	my $rdf = $self->_get_helper();
 	$rdf->include_rdfxml( xml => $rdfxml );
 	if ( $rdf->exists(undef, 'rdf:type', 'owl:Class') ) {
@@ -77,13 +77,14 @@ sub _parse_classes {
 		my ($resource, $class_data) = @_;
 		debug "parsing: $resource";
 		# Do Class::MOP/Moose Magic
-		my $name = _get_name($resource);		
-		_create_class($name, $resource, $class_data)			
+		my ($name, $class) = _create_class($resource, $class_data);
+		$class{ $class->{name} } = $class;	
 	});
 }
 
 sub _create_class { 
-	my ($name, $resource, $class_data) = @_;
+	my ($resource, $class_data) = @_;
+	my $name = _get_name($resource);			
 	my $class;
 	if ($name) { 
 		$class = Class::MOP::Class->create($name); 
@@ -91,7 +92,8 @@ sub _create_class {
 		$class = Class::MOP::Class->create_anon_class; 
 	}
 	
-	#XXX This is obviously wrong, ask #moose the right answer
+	#XXX This is obviously wrong, 
+	# the right answer is to subclass Class::MOP::Class to not make ->meta immutable.
 	$class->{name} = $name;
 	$class->{resource} = $resource;
 	
@@ -99,10 +101,8 @@ sub _create_class {
 		my $attr = Class::MOP::Attribute->new('$'.$_ => ( default => sub { $class_data->{$_} } ) );	
 		$class->add_attribute($attr);
 	}
-	
-	#$class_data->{name} = ($name || $resource);
-	#$class_data->{resource} = $resource;			
-	$class{ $class_data->{name} } = $class;
+			
+	return $name, $class;
 }
 
 sub _parse_inheritance { 
@@ -111,13 +111,12 @@ sub _parse_inheritance {
 		_parse_resource($rdf, $c->{resource}, sub {
 				my ($instance, $class_data) = @_;
 				my $name = _get_name($instance);
-				_create_class($name, $instance, $class_data) unless (exists $class{$name});
+				unless (exists $class{$name}) { 
+					my ($name, $class) = _create_class($instance, $class_data);
+					$class{$name} = $class;
+				}
 				my $i =  $class{$name};
 				debug "$i->{name} is an instance of $c->{name}";				
-				# Do Class::MOP/Moose Magic
-				#$class{ $c->{name} }->{hasInstance}{ $i->{name} } = $i;
-				
-				# fix this for Moose 
 				$i->superclasses( $i->superclasses, $c );
 		})				
 	}	
