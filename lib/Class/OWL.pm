@@ -86,10 +86,9 @@ sub parse_rdfxml {
 		_parse_classes($rdf);
 		_parse_inheritance($rdf);  	
     }
-	#	print $rdf->serialize(format => 'rdfxml-abbrev');
 }
 
-sub _get_name { return ($_[0] =~ /#(\w+)$/)[0]; }
+sub _get_name { return ($_[0] =~ /[#\/](\w+)$/)[0]; }
 
 sub _parse_classes {
 	my ($rdf) = @_;
@@ -119,8 +118,7 @@ sub _create_class {
 	$class->{resource} = $resource;
 	
 	for (keys %$class_data) {			
-		my $attr = _create_attribute($_ => $class_data->{$_});
-		$class->add_attribute($attr);
+		$class->{$_} = $class_data->{$_};
 	}
 			
 	return $name, $class;
@@ -137,14 +135,14 @@ sub _parse_inheritance {
 	for my $c (values %class) {
 		_parse_resource($rdf, $c->{resource}, sub {
 				my ($instance, $class_data) = @_;
-				my $name = _get_name($instance);
+				my $name = _get_name($instance);				
 				unless (exists $class{$name}) { 
 					my ($name, $class) = _create_class($instance, $class_data);
 					$class{$name} = $class;
 				}
 				my $i =  $class{$name};
-				debug "$i->{name} is an instance of $c->{name}";				
-				$i->superclasses( $i->superclasses, $c );
+				debug "$i->{name} is an instance of $c->{name}";			
+				$i->superclasses( $i->superclasses(), $c->{name} );
 		})				
 	}	
 }
