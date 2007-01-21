@@ -1,6 +1,5 @@
-package Class::OWL::MOP::Class;
+package Class::OWL::MOP;
 use base qw(Class::MOP::Class);
-
 
 package Class::OWL;
 
@@ -20,7 +19,6 @@ use LWP::Simple qw(get);
 use XML::CommonNS qw(RDF RDFS OWL);
 
 my %CONFIG = (
-    BaseInterface => 'RDF::Redland',
     Namespaces    => {
         rdf  => "$RDF",
         rdfs => "$RDFS",
@@ -35,9 +33,7 @@ sub import {
 	my $class = shift;
 	my %opt = @_;
 	
-	if ($opt{debug}) {
-		$DEBUG = 1;
-	}
+	if ($opt{debug}) { $DEBUG = 1; }
 	
 	if ($opt{namespaces}) {
 		$CONFIG{Namespaces} = {
@@ -108,34 +104,36 @@ sub _create_class {
 	my ($resource, $class_data) = @_;
 	my $name = _get_name($resource);			
 	my $class;
+	
 	if ($name) { 
-		$class = Class::OWL::MOP::Class->create($name); 
+		$class = Class::OWL::MOP->create($name); 
+		$class->name($name);
 	} else {
-		$class = Class::OWL::MOP::Class->create_anon_class;
+		$class = Class::OWL::MOP->create_anon_class;
 		$name = $class->name;
 	}
-	
-	$class->meta->add_attribute( _create_attribute('name' => $name) );		
-	$class->meta->add_attribute( _create_attribute('resource' => $resource) );	
-	
-	for (keys %$class_data) {
-		my $attr = _create_attribute($_ => $class_data->{$_});
-		$class->meta->add_attribute($attr);		
+
+	for my $attr (_create_attribute('name' => $name), _create_attribute('resource' => $resource)) {
+		$class->meta->add_attribute( $attr );
 	}
-			
+        
+#   for (keys %$class_data) { _create_attribute($_ => $class_data->{$_}) };
+	
+	$class->resource($resource); ## dies here because $class->resource accessor doesn't exist
 	return $name, $class;
 }
 
 sub _create_attribute {
 	my ($name, $value) = @_;
 	if (ref $value) { $value = sub { $value }; }
-	return Class::MOP::Attribute->new('$'.$name => ( default => $value ) );		
+	my %config = ( default => $value, accessor => $name );
+	return Class::MOP::Attribute->new('$'.$name => %config );		
 }
 
 sub _parse_inheritance { 
 	my ($rdf) = @_;
 	for my $c (values %class) {
-		_parse_resource($rdf, $c->{resource}, sub {
+		my $sub = sub {
 				my ($instance, $class_data) = @_;
 				my $name = _get_name($instance);				
 				unless (exists $class{$name}) { 
@@ -145,7 +143,8 @@ sub _parse_inheritance {
 				my $i =  $class{$name};
 				debug $i->name . " is an instance of " . $c->name;			
 				$i->superclasses( $i->superclasses(), $c->name );
-		})				
+		};
+		_parse_resource($rdf, $c->resource, $sub);			
 	}	
 }
 
