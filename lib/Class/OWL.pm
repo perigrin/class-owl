@@ -30,9 +30,22 @@ my %CONFIG = (
     ExpandQNames => 1,
 );
 
+my $DEBUG = 0;
+
 our %class;
 
-sub debug($) { print STDERR @_, "\n" }
+sub import {
+	my $class = shift;
+	my %opt = @_;
+	if ($opt{url}) {
+		$class->parse_url($opt{url});
+	} 
+	elsif ($opt{file}) {
+		$class->parse_url($opt{url});
+	}
+}
+
+sub debug($) { return unless $DEBUG; print STDERR @_, "\n" }
 
 sub _get_helper { return RDF::Helper->new(%CONFIG); }
 
@@ -51,7 +64,6 @@ sub parse_url {
     ( my $uri = $url ) =~ s/\.rdf$//;
     my $rdfxml = get($url);
 	$CONFIG{'Namespaces'}->{'#default'} = $url;
-	$CONFIG{'Namespaces'}->{'wine'} = 'http://www.w3.org/TR/2003/PR-owl-guide-20031209/wine';
     return $self->parse_rdfxml($rdfxml);
 }
 
@@ -65,7 +77,7 @@ sub parse_rdfxml {
 		_parse_classes($rdf);
 		_parse_inheritance($rdf);  	
     }
-	print Dump \%class;
+	debug Dump \%class;
 	#	print $rdf->serialize(format => 'rdfxml-abbrev');
 }
 
@@ -78,7 +90,7 @@ sub _parse_classes {
 		debug "parsing: $resource";
 		# Do Class::MOP/Moose Magic
 		my ($name, $class) = _create_class($resource, $class_data);
-		$class{ $class->{name} } = $class;	
+		$class{ $name } = $class;	
 	});
 }
 
@@ -89,7 +101,8 @@ sub _create_class {
 	if ($name) { 
 		$class = Class::MOP::Class->create($name); 
 	} else {
-		$class = Class::MOP::Class->create_anon_class; 
+		$class = Class::MOP::Class->create_anon_class;
+		$name = ref $class;
 	}
 	
 	#XXX This is obviously wrong, 
