@@ -32,18 +32,32 @@ my %CONFIG = (
 
 my $DEBUG = 0;
 
-our %class;
-
 sub import {
 	my $class = shift;
 	my %opt = @_;
+	
+	if ($opt{debug}) {
+		$DEBUG = 1;
+	}
+	
+	if ($opt{namespaces}) {
+		$CONFIG{Namespaces} = {
+			%{ $CONFIG{Namespaces} },
+			%{ $opt{namespaces} },
+		}		
+	}
+	
 	if ($opt{url}) {
+		$CONFIG{Namespaces}{'#default'} ||= $opt{url};
 		$class->parse_url($opt{url});
-	} 
-	elsif ($opt{file}) {
+	} 		
+		
+	if ($opt{file}) {
 		$class->parse_url($opt{url});
 	}
 }
+
+our %class;
 
 sub debug($) { return unless $DEBUG; print STDERR @_, "\n" }
 
@@ -62,8 +76,7 @@ sub _parse_resource {
 sub parse_url {
     my ( $self, $url ) = @_;
     ( my $uri = $url ) =~ s/\.rdf$//;
-    my $rdfxml = get($url);
-	$CONFIG{'Namespaces'}->{'#default'} = $url;
+    my $rdfxml = get($url);	
     return $self->parse_rdfxml($rdfxml);
 }
 
@@ -110,7 +123,7 @@ sub _create_class {
 	$class->{name} = $name;
 	$class->{resource} = $resource;
 	
-	for (keys %$class_data) {	
+	for (keys %$class_data) {			
 		my $attr = Class::MOP::Attribute->new('$'.$_ => ( default => sub { $class_data->{$_} } ) );	
 		$class->add_attribute($attr);
 	}
