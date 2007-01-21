@@ -6,8 +6,6 @@ use warnings;
 use strict;
 use Carp;
 
-use YAML::Syck;
-
 use RDF::Helper;
 
 use Class::MOP;
@@ -16,8 +14,7 @@ use Class::MOP::Attribute;
 
 use LWP::Simple qw(get);
 
-use XML::CommonNS qw(RDF RDFS OWL DC);
-my $FOAF = XML::NamespaceFactory->new("http://xmlns.com/foaf/0.1/");
+use XML::CommonNS qw(RDF RDFS OWL);
 
 my %CONFIG = (
     BaseInterface => 'RDF::Redland',
@@ -25,7 +22,6 @@ my %CONFIG = (
         rdf  => "$RDF",
         rdfs => "$RDFS",
         owl  => "$OWL",
-        foaf => "$FOAF",
     },
     ExpandQNames => 1,
 );
@@ -82,7 +78,7 @@ sub parse_url {
 
 sub parse_rdfxml {
 	my ($self, $rdfxml) = @_;
-	debug $rdfxml;
+	
 	my $rdf = $self->_get_helper();
 	$rdf->include_rdfxml( xml => $rdfxml );
 	if ( $rdf->exists(undef, 'rdf:type', 'owl:Class') ) {
@@ -90,7 +86,6 @@ sub parse_rdfxml {
 		_parse_classes($rdf);
 		_parse_inheritance($rdf);  	
     }
-	debug Dump \%class;
 	#	print $rdf->serialize(format => 'rdfxml-abbrev');
 }
 
@@ -124,11 +119,17 @@ sub _create_class {
 	$class->{resource} = $resource;
 	
 	for (keys %$class_data) {			
-		my $attr = Class::MOP::Attribute->new('$'.$_ => ( default => sub { $class_data->{$_} } ) );	
+		my $attr = _create_attribute($_ => $class_data->{$_});
 		$class->add_attribute($attr);
 	}
 			
 	return $name, $class;
+}
+
+sub _create_attribute {
+	my ($name, $value) = @_;
+	if (ref $value) { $value = sub { $value }; }
+	return Class::MOP::Attribute->new('$'.$name => ( default => $value ) );		
 }
 
 sub _parse_inheritance { 
@@ -223,13 +224,7 @@ Class::OWL requires no configuration files or environment variables.
 
 =head1 DEPENDENCIES
 
-=for author to fill in:
-    A list of all the other modules that this module relies upon,
-    including any restrictions on versions, and an indication whether
-    the module is part of the standard Perl distribution, part of the
-    module's distribution, or must be installed separately. ]
-
-None.
+Class::MOP, RDF::Helper, LWP::Simple, XML::CommonNS
 
 
 =head1 INCOMPATIBILITIES
