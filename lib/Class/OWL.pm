@@ -1,3 +1,7 @@
+package Class::OWL::MOP::Class;
+use base qw(Class::MOP::Class);
+
+
 package Class::OWL;
 
 use version; $VERSION = qv('0.0.1');
@@ -7,9 +11,8 @@ use strict;
 use Carp;
 
 use RDF::Helper;
-
 use Class::MOP;
-use Class::MOP::Class;
+#use Class::OWL::MOP::Class;
 use Class::MOP::Attribute;
 
 use LWP::Simple qw(get);
@@ -106,19 +109,18 @@ sub _create_class {
 	my $name = _get_name($resource);			
 	my $class;
 	if ($name) { 
-		$class = Class::MOP::Class->create($name); 
+		$class = Class::OWL::MOP::Class->create($name); 
 	} else {
-		$class = Class::MOP::Class->create_anon_class;
-		$name = ref $class;
+		$class = Class::OWL::MOP::Class->create_anon_class;
+		$name = $class->name;
 	}
 	
-	#XXX This is obviously wrong, 
-	# the right answer is to subclass Class::MOP::Class to not make ->meta immutable.
-	$class->{name} = $name;
-	$class->{resource} = $resource;
+	$class->meta->add_attribute( _create_attribute('name' => $name) );		
+	$class->meta->add_attribute( _create_attribute('resource' => $resource) );	
 	
-	for (keys %$class_data) {			
-		$class->{$_} = $class_data->{$_};
+	for (keys %$class_data) {
+		my $attr = _create_attribute($_ => $class_data->{$_});
+		$class->meta->add_attribute($attr);		
 	}
 			
 	return $name, $class;
@@ -141,8 +143,8 @@ sub _parse_inheritance {
 					$class{$name} = $class;
 				}
 				my $i =  $class{$name};
-				debug "$i->{name} is an instance of $c->{name}";			
-				$i->superclasses( $i->superclasses(), $c->{name} );
+				debug $i->name . " is an instance of " . $c->name;			
+				$i->superclasses( $i->superclasses(), $c->name );
 		})				
 	}	
 }
