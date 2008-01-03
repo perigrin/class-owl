@@ -7,5 +7,6 @@ README
 .project
 lib/Class/OWL.pm
 t/00.load.t
+t/01.wine.t
 t/pod-coverage.t
 t/pod.t
