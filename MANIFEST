@@ -4,6 +4,7 @@ MANIFEST
 META.yml # Will be created by "make dist"
 Makefile.PL
 README
+.project
 lib/Class/OWL.pm
 t/00.load.t
 t/pod-coverage.t
