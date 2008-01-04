@@ -3,7 +3,7 @@ use base qw(Class::MOP::Class);
 
 sub new_instance {
 	my $self = shift;
-	my $uri = shift;
+	my $uri = shift || Class::OWL->get_helper()->new_bnode(); # this may break uniqueness - refactor!
 	
 	if (ref $_[0] && $_[0]->isa('RDF::Helper'))
 	{
