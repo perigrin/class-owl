@@ -172,9 +172,8 @@ sub to_rdf($) {
 	$rdf->assert_resource( $i->_resource, 'rdf:type', $i->meta->_type );
 	foreach my $attr ( $i->meta->compute_all_applicable_attributes() ) {
 		next if $attr->name eq '$_resource';
-		my $value = $attr->get_value($i);
-		next unless $value;
-		_assert_triple($rdf,$i->_resource,$attr->_resource,$value);
+		next unless $attr->has_value($i);
+		_assert_triple($rdf,$i->_resource,$attr->_resource,$attr->get_value($i));
 	}
 	return $rdf;
 }
