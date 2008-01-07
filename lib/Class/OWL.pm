@@ -3,11 +3,11 @@ use base qw(Class::MOP::Class);
 
 sub new_instance {
 	my $self = shift;
-	my $uri = shift || Class::OWL->get_helper()->new_bnode(); # this may break uniqueness - refactor!
+	my $uri = shift;
+	my $rdf = shift;
 	
 	if (ref $_[0] && $_[0]->isa('RDF::Helper'))
 	{
-		my $rdf = shift;
 		die "Inconsistent type"
 			unless $rdf->exists($uri,'rdf:type',$self->_type);
 	
@@ -15,7 +15,9 @@ sub new_instance {
 	}
 	else
 	{
-		return Class::OWL->new_instance($self->_type => $uri,@_);
+		my $rdf = Class::OWL->get_helper() unless $rdf;
+		$uri = $rdf->new_bnode() unless $uri;
+		return Class::OWL->new_instance($rdf,$self->_type => $uri,@_);
 	}
 }
 
@@ -171,7 +173,7 @@ sub to_rdf($) {
 	$rdf = get_helper() unless $rdf;
 	$rdf->assert_resource( $i->_resource, 'rdf:type', $i->meta->_type );
 	foreach my $attr ( $i->meta->compute_all_applicable_attributes() ) {
-		next if $attr->name eq '$_resource';
+		next if $attr->name eq '$_resource' || $attr->name eq '$_model';
 		next unless $attr->has_value($i);
 		_assert_triple($rdf,$i->_resource,$attr->_resource,$attr->get_value($i));
 	}
@@ -192,7 +194,7 @@ sub from_rdf($$) {
 	$subject = $rdf->new_resource($subject) unless ref $subject;
 	my $instance_data = $rdf->property_hash($subject);
 	my $type = $instance_data->{'rdf:type'};
-	my $o = Class::OWL->new_instance($type => $subject);
+	my $o = Class::OWL->new_instance($rdf,$type => $subject);
 	my $m = $o->meta;
 	
 	foreach my $stmt ($rdf->get_statements($subject)) {
@@ -253,12 +255,13 @@ sub owl_property {
 }
 
 sub new_instance {
-	my ( $self, $type, $subject, @params ) = @_;
+	my ( $self, $rdf, $type, $subject, @params ) = @_;
 	debug "New instance of $type -> ".$self->owl_class($type);
 	my $c = $self->owl_class($type);
 	die "No such class $type" unless $c;
 	my $o = $c->new_object(@params);
 	$o->_resource($subject) if $subject;
+	$o->_model($rdf);
 	$o;
 }
 
@@ -390,11 +393,13 @@ sub _create_class {
 	
 	debug "Create class from "._r_name($resource)." as $name";
 	
-	for my $attr ( _create_attribute( '_type' => $resource ) ) {
+	for my $attr ( _create_attribute( '_type' => $resource )) 
+	{
 		$class->meta->add_attribute($attr);
 	}
 
-	for my $attr ( _create_attribute( '_resource', $resource ) ) {
+	for my $attr (_create_attribute( '_resource',$resource), _create_attribute('_model')) 
+	{
 		$class->add_attribute($attr);
 	}
 
