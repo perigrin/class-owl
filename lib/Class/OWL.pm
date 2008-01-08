@@ -1,24 +1,34 @@
 package Class::OWL::MOP;
 use base qw(Class::MOP::Class);
 
-sub new_instance {
-	my $self = shift;
-	my $uri = shift;
-	my $rdf = shift;
+use Data::Dumper;
+
+sub from_rdf {
+	my ($self,$uri,$rdf) = @_;
 	
-	if (ref $_[0] && $_[0]->isa('RDF::Helper'))
-	{
-		die "Inconsistent type"
+	die "Inconsistent type"
 			unless $rdf->exists($uri,'rdf:type',$self->_type);
 	
-		Class::OWL->from_rdf($uri,$rdf);
-	}
-	else
-	{
-		my $rdf = Class::OWL->get_helper() unless $rdf;
-		$uri = $rdf->new_bnode() unless $uri;
-		return Class::OWL->new_instance($rdf,$self->_type => $uri,@_);
-	}
+	Class::OWL->from_rdf($uri,$rdf);
+}
+
+sub new_instance {
+	my $self = shift;
+	
+	my ($uri,$rdf);
+	
+	# (uri,rdf)
+	# (uri)
+	# (rdf)
+	# (rdf,uri)  
+	
+	$uri = shift unless ref $_[0];
+	$rdf = shift if ref $_[0] && $_[0]->isa("RDF::Helper");
+	$uri = shift unless $uri;
+	
+	$rdf = Class::OWL->get_helper() unless $rdf;
+	$uri = $rdf->new_bnode() unless $uri;
+	return Class::OWL->new_instance($rdf,$self->_type => $uri,@_);
 }
 
 package Class::OWL::Property;
@@ -180,7 +190,7 @@ sub to_rdf($) {
 	return $rdf;
 }
 
-sub from_rdf($$) {
+sub from_rdf {
 	my ($self,$subject,$rdf) = @_;
 	
 	unless (ref $rdf)
@@ -256,6 +266,10 @@ sub owl_property {
 
 sub new_instance {
 	my ( $self, $rdf, $type, $subject, @params ) = @_;
+	#warn $self;
+	#warn $rdf;
+	#warn $type;
+	#warn $subject;
 	debug "New instance of $type -> ".$self->owl_class($type);
 	my $c = $self->owl_class($type);
 	die "No such class $type" unless $c;
