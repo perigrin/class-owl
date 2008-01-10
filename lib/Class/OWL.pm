@@ -14,7 +14,6 @@ sub from_rdf {
 
 sub new_instance {
 	my $self = shift;
-	
 	my ($uri,$rdf);
 	
 	# (uri,rdf)
@@ -134,7 +133,7 @@ my %CONFIG = (
 	ExpandQNames => 1,
 );
 
-my $DEBUG = 0;
+my $DEBUG = 1;
 sub debug($) { return unless $DEBUG; print STDERR @_, "\n" }
 
 
@@ -190,6 +189,15 @@ sub to_rdf($) {
 	return $rdf;
 }
 
+sub _phash {
+    my ($rdf,$subject) = @_;
+    my %h;
+    foreach my $stmt ($rdf->get_statements($subject)) {
+        $h{_r_name($stmt->[1])} = _r_name($stmt->[2]);
+    }
+    \%h;
+}
+
 sub from_rdf {
 	my ($self,$subject,$rdf) = @_;
 	
@@ -198,9 +206,8 @@ sub from_rdf {
 		my $xml = $rdf;
 		$rdf = $self->get_helper();
 		$rdf->include_rdfxml( xml => $xml );
-		#print $rdf->serialize( filename => '/tmp/input.n3', format => 'ntriples' );
 	}
-	
+		
 	$subject = $rdf->new_resource($subject) unless ref $subject;
 	my $instance_data = $rdf->property_hash($subject);
 	my $type = $instance_data->{'rdf:type'};
@@ -244,8 +251,8 @@ our %class;
 our %attribute;
 
 sub _r_name {
-	return $_[0] unless ref $_[0]; 
-	$_[0]->is_blank ? $_[0]->blank_identifier : $_[0]->uri->as_string;
+    my $r = ref $_[0] ? $_[0] : RDF::Helper->new_resource($_[0]);
+    $r->is_blank ? $r->blank_identifier : $r->uri->as_string;
 }
 
 sub owl_class {
@@ -266,13 +273,15 @@ sub owl_property {
 
 sub new_instance {
 	my ( $self, $rdf, $type, $subject, @params ) = @_;
+	#warn caller();
 	#warn $self;
 	#warn $rdf;
 	#warn $type;
 	#warn $subject;
-	debug "New instance of $type -> ".$self->owl_class($type);
+	
 	my $c = $self->owl_class($type);
 	die "No such class $type" unless $c;
+	debug "New instance of "._r_name($type)." -> ".$c->name;
 	my $o = $c->new_object(@params);
 	$o->_resource($subject) if $subject;
 	$o->_model($rdf);
