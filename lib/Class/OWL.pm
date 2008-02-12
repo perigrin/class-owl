@@ -133,7 +133,7 @@ my %CONFIG = (
 	ExpandQNames => 1,
 );
 
-my $DEBUG = 1;
+my $DEBUG = 0;
 sub debug($) { return unless $DEBUG; print STDERR @_, "\n" }
 
 
@@ -179,7 +179,7 @@ sub _assert_triple {
 
 sub to_rdf($) {
 	my ( $self, $i, $rdf ) = @_;
-	$rdf = get_helper() unless $rdf;
+	$rdf = $self->get_helper() unless $rdf;
 	$rdf->assert_resource( $i->_resource, 'rdf:type', $i->meta->_type );
 	foreach my $attr ( $i->meta->compute_all_applicable_attributes() ) {
 		next if $attr->name eq '$_resource' || $attr->name eq '$_model';
@@ -318,7 +318,7 @@ sub parse_rdfxml {
 
 	my $rdf = $self->get_helper();
 	$rdf->include_rdfxml( xml => $rdfxml );
-	print $rdf->serialize( filename => '/tmp/model.n3', format => 'ntriples' );
+	#print $rdf->serialize( filename => '/tmp/model.n3', format => 'ntriples' );
 	if ( $rdf->exists( undef, 'rdf:type', 'owl:Class' ) ) {
 		_parse_classes($package,$rdf);			
 		_parse_properties($package,$rdf);

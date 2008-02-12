@@ -1,4 +1,5 @@
-use Test::More skip_all => 'debug strange 255 exit code';
+#use Test::More skip_all => 'debug strange 255 exit code';
+use Test::More tests => 1;
 
 # this works but it still fails - will debug
 use Class::OWL
