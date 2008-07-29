@@ -30,8 +30,37 @@ sub new_instance {
 	return Class::OWL->new_instance($rdf,$self->_type => $uri,@_);
 }
 
+sub accessor {
+	my ($mop,$o,$a,$v) = @_;
+	
+	my $attr = $mop->find_attribute_by_name('$'.$a);
+	
+	unless ($attr) {
+		warn caller();
+		die "No such attribute $a on $o";
+	}
+	
+	if (defined $v) {
+		if ($v) {
+			$attr->set_value($o,$v);
+		} else {
+			$attr->clear_value($o);
+		}
+	}
+	$v = $attr->get_value($o);
+	
+	return undef unless defined $v;
+	
+	if (wantarray) {
+		return ref $v eq 'ARRAY' ? @$v : ($v);
+	} else {
+		return ref $v eq 'ARRAY' ? $v->[0] : $v;
+	}
+}
+
 package Class::OWL::Property;
 use base qw(Class::MOP::Attribute);
+use Data::Dumper;
 
 sub _resource {
 	$_[0]->{_resource};
@@ -64,8 +93,6 @@ sub min_cardinality {
 	$_[0]->{_cardinality}->[0];
 }
 
-use Data::Dumper;
-
 sub restrict {
 	my ($p,$property_data,$rdf) = @_;
 	$p->{_cardinality} = [0,undef] unless $p->{_cardinality};
@@ -84,40 +111,12 @@ sub restrict {
 		if $property_data->{'rdfs:range'};
 }
 
-sub _accessor {
+sub _accessor_info {
 	my ($self,$name) = @_;
 	
 	return {
-		$name => 
-			sub {
-				my ($o,$k,$v) = @_;
-				
-				my $class = ref $o || $o;
-				my $attr = $class->meta->find_attribute_by_name('$'.$name);
-				
-				unless ($attr) {
-					warn Dumper($class->meta);
-					die "No such attribute $name on $o";
-				}
-				
-				if (defined $v) {
-					if ($v) {
-						$attr->set_value($o,$v);
-					} else {
-						$attr->clear_value($o);
-					}
-				}
-				$v = $attr->get_value($o,$k);
-				
-				return undef unless defined $v;
-				
-				if (wantarray) {
-					return ref $v eq 'ARRAY' ? @$v : ($v);
-				} else {
-					return ref $v eq 'ARRAY' ? $v->[0] : $v;
-				}
-			}
-		};
+		$name => sub { my ($o,$v) = @_; $o->meta->accessor($o,$name,$v) }
+	};
 }
 
 sub new {
@@ -128,7 +127,7 @@ sub new {
 	die "Malformed resource $resource" unless $name;
 	my $p = bless Class::MOP::Attribute->new(
 		'$'.$name => (
-			accessor => Class::OWL::Property->_accessor($name),
+			accessor => Class::OWL::Property->_accessor_info($name),
 			init_arg => ':' . $name,
 			default  => $value,
 		  )
@@ -462,6 +461,18 @@ sub _create_class {
 	{
 		$class->add_attribute($attr);
 	}
+
+	$class->add_method('new' => sub {
+		my $class = shift;
+		my $uri = shift;
+		my %args = @_;
+		
+		my $o = $class->meta->new_instance($uri);
+		foreach my $attr (keys %args) {
+			$o->meta->accessor($o,$attr,$args{$attr})
+		}
+		$o;
+	});
 
 	$class->add_method('_rdf' => sub {
 		Class::OWL->to_rdf($_[0]);
