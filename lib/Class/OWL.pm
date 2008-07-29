@@ -84,6 +84,42 @@ sub restrict {
 		if $property_data->{'rdfs:range'};
 }
 
+sub _accessor {
+	my ($self,$name) = @_;
+	
+	return {
+		$name => 
+			sub {
+				my ($o,$k,$v) = @_;
+				
+				my $class = ref $o || $o;
+				my $attr = $class->meta->find_attribute_by_name('$'.$name);
+				
+				unless ($attr) {
+					warn Dumper($class->meta);
+					die "No such attribute $name on $o";
+				}
+				
+				if (defined $v) {
+					if ($v) {
+						$attr->set_value($o,$v);
+					} else {
+						$attr->clear_value($o);
+					}
+				}
+				$v = $attr->get_value($o,$k);
+				
+				return undef unless defined $v;
+				
+				if (wantarray) {
+					return ref $v eq 'ARRAY' ? @$v : ($v);
+				} else {
+					return ref $v eq 'ARRAY' ? $v->[0] : $v;
+				}
+			}
+		};
+}
+
 sub new {
 	my ( $class, $resource, $property_data, $rdf ) = @_;
 	
@@ -91,9 +127,8 @@ sub new {
 	my $name = Class::OWL::_get_name($resource);
 	die "Malformed resource $resource" unless $name;
 	my $p = bless Class::MOP::Attribute->new(
-		'$'
-		  . $name => (
-			accessor => $name,
+		'$'.$name => (
+			accessor => Class::OWL::Property->_accessor($name),
 			init_arg => ':' . $name,
 			default  => $value,
 		  )
@@ -135,7 +170,6 @@ my %CONFIG = (
 
 my $DEBUG = 0;
 sub debug($) { return unless $DEBUG; print STDERR @_, "\n" }
-
 
 sub import {
 	my $class = shift;
@@ -180,9 +214,11 @@ sub _assert_triple {
 sub to_rdf($) {
 	my ( $self, $i, $rdf ) = @_;
 	$rdf = $self->get_helper() unless $rdf;
-	$rdf->assert_resource( $i->_resource, 'rdf:type', $i->meta->_type );
+	foreach my $t (@{$i->_type()}) {
+		$rdf->assert_resource( $i->_resource, 'rdf:type', $t );
+	}
 	foreach my $attr ( $i->meta->compute_all_applicable_attributes() ) {
-		next if $attr->name eq '$_resource' || $attr->name eq '$_model';
+		next if $attr->name eq '$_resource' || $attr->name eq '$_model' || $attr->name eq '$_type';
 		next unless $attr->has_value($i);
 		_assert_triple($rdf,$i->_resource,$attr->_resource,$attr->get_value($i));
 	}
@@ -217,7 +253,7 @@ sub from_rdf {
 	foreach my $stmt ($rdf->get_statements($subject)) {
 		next if $stmt->[1]->as_string eq 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 		my $p = Class::OWL->owl_property($stmt->[1]);
-		die "Unknown property type $stmt->[1]" unless $p;
+		die "Unknown property type "._r_name($stmt->[1]) unless $p;
 		my $attr = $m->find_attribute_by_name($p->name);
 		die "Unknown attribute ".$p->name unless $attr;
 		
@@ -285,6 +321,7 @@ sub new_instance {
 	my $o = $c->new_object(@params);
 	$o->_resource($subject) if $subject;
 	$o->_model($rdf);
+	$o->_type([$type]);
 	$o;
 }
 
@@ -421,7 +458,7 @@ sub _create_class {
 		$class->meta->add_attribute($attr);
 	}
 
-	for my $attr (_create_attribute( '_resource',$resource), _create_attribute('_model')) 
+	for my $attr (_create_attribute( '_resource'), _create_attribute('_type'), _create_attribute('_model')) 
 	{
 		$class->add_attribute($attr);
 	}
@@ -441,7 +478,10 @@ sub _create_attribute {
 	if ( ref $value ) {
 		$value = sub { $value };
 	}
-	my %config = ( default => $value, accessor => $name );
+	my %config = ( 
+		default => $value, 
+		accessor => $name,
+	);
 	return Class::MOP::Attribute->new( '$' . $name => %config );
 }
 
