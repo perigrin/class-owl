@@ -25,7 +25,7 @@ sub new_instance {
 	$rdf = shift if ref $_[0] && $_[0]->isa("RDF::Helper");
 	$uri = shift unless $uri;
 	
-	$rdf = Class::OWL->get_helper() unless $rdf;
+	$rdf = Class::OWL->new_model() unless $rdf;
 	$uri = $rdf->new_bnode() unless $uri;
 	return Class::OWL->new_instance($rdf,$self->_type => $uri,@_);
 }
@@ -212,7 +212,7 @@ sub _assert_triple {
 
 sub to_rdf($) {
 	my ( $self, $i, $rdf ) = @_;
-	$rdf = $self->get_helper() unless $rdf;
+	$rdf = $self->new_model() unless $rdf;
 	foreach my $t (@{$i->_type()}) {
 		$rdf->assert_resource( $i->_resource, 'rdf:type', $t );
 	}
@@ -239,7 +239,7 @@ sub from_rdf {
 	unless (ref $rdf)
 	{
 		my $xml = $rdf;
-		$rdf = $self->get_helper();
+		$rdf = $self->new_model();
 		$rdf->include_rdfxml( xml => $xml );
 	}
 		
@@ -324,7 +324,7 @@ sub new_instance {
 	$o;
 }
 
-sub get_helper { return RDF::Helper->new(%CONFIG); }
+sub new_model { return RDF::Helper->new(%CONFIG); }
 
 sub _for_type {
 	my ( $rdf, $type, $sub) = @_;
@@ -352,7 +352,7 @@ sub parse_url {
 sub parse_rdfxml {
 	my ( $self, $package, $rdfxml ) = @_;
 
-	my $rdf = $self->get_helper();
+	my $rdf = $self->new_model();
 	$rdf->include_rdfxml( xml => $rdfxml );
 	#print $rdf->serialize( filename => '/tmp/model.n3', format => 'ntriples' );
 	if ( $rdf->exists( undef, 'rdf:type', 'owl:Class' ) ) {
@@ -464,10 +464,18 @@ sub _create_class {
 
 	$class->add_method('new' => sub {
 		my $class = shift;
-		my $uri = shift;
+		my ($rdf,$uri);
+		
+		$uri = shift unless ref $_[0];
+		$rdf = shift if ref $_[0] && $_[0]->isa("RDF::Helper");
+		$uri = shift unless $uri;
+	
+		$rdf = Class::OWL->new_model() unless $rdf;
+		$uri = $rdf->new_bnode() unless $uri;
+		
 		my %args = @_;
 		
-		my $o = $class->meta->new_instance($uri);
+		my $o = $class->meta->new_instance($rdf,$uri);
 		foreach my $attr (keys %args) {
 			$o->meta->accessor($o,$attr,$args{$attr})
 		}
