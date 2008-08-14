@@ -461,6 +461,10 @@ sub _create_class {
 	{
 		$class->add_attribute($attr);
 	}
+	
+	$class->add_method('new_model' => sub {
+		Class::OWL->new_model();
+	});
 
 	$class->add_method('new' => sub {
 		my $class = shift;
