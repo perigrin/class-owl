@@ -290,18 +290,24 @@ sub _r_name {
     $r->is_blank ? $r->blank_identifier : $r->uri->as_string;
 }
 
+sub _f {
+	ref $_[0] eq 'ARRAY' ? $_[0]->[0] : $_[0];  # XXX should be the most significant class!
+}
+
 sub owl_class {
 	my $self = shift;
-	my $name = _r_name($_[0]);
-	die "Malformed resource $_[0] ", caller() unless $name;
+	my $u = _f($_[0]);
+	my $name = _r_name($u);
+	die "Malformed resource $u ", caller() unless $name;
 	$class{$name} = $_[1] if $_[1];
 	return $class{$name};
 }
 
 sub owl_property {
 	my $self = shift;
-	my $name = _r_name($_[0]);
-	die "Malformed resource $_[0]", caller() unless $name;
+	my $u = _f($_[0]);
+	my $name = _r_name($u);
+	die "Malformed resource $u", caller() unless $name;
 	$attribute{$name} = $_[1] if $_[1];
 	return $attribute{$name};
 }
@@ -316,11 +322,11 @@ sub new_instance {
 	
 	my $c = $self->owl_class($type);
 	die "No such class $type" unless $c;
-	debug "New instance of "._r_name($type)." -> ".$c->name;
+	debug "New instance of "._r_name(_f($type))." -> ".$c->name;
 	my $o = $c->new_object(@params);
 	$o->_resource($subject) if $subject;
 	$o->_model($rdf);
-	$o->_type([$type]);
+	$o->_type([_f($type)]);
 	$o;
 }
 
