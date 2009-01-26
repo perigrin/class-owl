@@ -1,14 +1,20 @@
-# http://module-build.sourceforge.net/META-spec.html
-#XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
-name:         Class-OWL
-version:      0.0.4
-version_from: lib/Class/OWL.pm
-installdirs:  site
-requires:
+--- #YAML:1.0
+name:                Class-OWL
+version:             0.0.5
+abstract:            Generate perl classes from OWL schema
+license:             ~
+author:              
+    - Chris Prather <cpan@prather.org>
+generated_by:        ExtUtils::MakeMaker version 6.42
+distribution_type:   module
+requires:     
     Class::MOP:                    0
+    Data::Dumper:                  0
+    LWP::Simple:                   0
+    RDF::Helper:                   0
     Test::More:                    0
     version:                       0
     XML::CommonNS:                 0
-
-distribution_type: module
-generated_by: ExtUtils::MakeMaker version 6.30_01
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3
