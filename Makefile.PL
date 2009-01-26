@@ -13,6 +13,9 @@ WriteMakefile(
         'version'    => 0,
         'Class::MOP' => 0,
         'XML::CommonNS' => 0,
+        'RDF::Helper' => 0,
+        'Data::Dumper' => 0,
+        'LWP::Simple' => 0
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Class-OWL-*' },
