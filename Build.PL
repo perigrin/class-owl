@@ -12,6 +12,10 @@ my $builder = Module::Build->new(
         'version'    => 0,
         'Class::MOP' => 0,
         'XML::CommonNS' => 0,
+        'RDF::Helper' => 0,
+        'Data::Dumper' => 0,
+        'LWP::Simple' => 0
+
     },
     add_to_cleanup      => [ 'Class-OWL-*' ],
 );

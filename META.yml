@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Class-OWL
-version:             0.0.5
+version:             0.0.6
 abstract:            Generate perl classes from OWL schema
 license:             ~
 author:              

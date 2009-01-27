@@ -140,7 +140,7 @@ sub new {
 
 package Class::OWL;
 
-use version; $VERSION = qv('0.0.5');
+use version; $VERSION = qv('0.0.6');
 
 use warnings;
 use strict;
@@ -449,7 +449,7 @@ sub _create_class {
 
 	if ($name) {
 		$class = Class::OWL::MOP->create($name);
-		$class->name($name);
+		$class->name();
 	}
 	else {
 		$class = Class::OWL::MOP->create_anon_class;
