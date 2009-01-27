@@ -140,7 +140,7 @@ sub new {
 
 package Class::OWL;
 
-use version; $VERSION = qv('0.0.5');
+use version; $VERSION = qv('0.0.6');
 
 use warnings;
 use strict;
