@@ -449,7 +449,7 @@ sub _create_class {
 
 	if ($name) {
 		$class = Class::OWL::MOP->create($name);
-		$class->name($name);
+		$class->name();
 	}
 	else {
 		$class = Class::OWL::MOP->create_anon_class;
