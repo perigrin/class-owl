@@ -233,7 +233,7 @@ sub _phash {
     \%h;
 }
 
-sub anon_class {
+sub create_anon_class {
 	Class::OWL::MOP->create_anon_class;
 }
 
@@ -456,7 +456,7 @@ sub _create_class {
 		$class->name();
 	}
 	else {
-		$class = anon_class();
+		$class = create_anon_class();
 		$name  = $class->name;
 	}
 	
