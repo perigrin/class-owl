@@ -233,10 +233,6 @@ sub _phash {
     \%h;
 }
 
-sub create_anon_class {
-	Class::OWL::MOP->create_anon_class;
-}
-
 sub from_rdf {
 	my ($self,$subject,$rdf) = @_;
 	
@@ -456,7 +452,7 @@ sub _create_class {
 		$class->name();
 	}
 	else {
-		$class = create_anon_class();
+		$class = Class::OWL::MOP->create_anon_class;
 		$name  = $class->name;
 	}
 	
