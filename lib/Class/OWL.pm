@@ -1,170 +1,25 @@
-package Class::OWL::MOP;
-use base qw(Class::MOP::Class);
-
-use Data::Dumper;
-
-sub from_rdf {
-	my ($self,$uri,$rdf) = @_;
-	
-	die "Inconsistent type"
-			unless $rdf->exists($uri,'rdf:type',$self->_type);
-	
-	Class::OWL->from_rdf($uri,$rdf);
-}
-
-sub new_instance {
-	my $self = shift;
-	my ($uri,$rdf);
-	
-	# (uri,rdf)
-	# (uri)
-	# (rdf)
-	# (rdf,uri)  
-	
-	$uri = shift unless ref $_[0];
-	$rdf = shift if ref $_[0] && $_[0]->isa("RDF::Helper");
-	$uri = shift unless $uri;
-	
-	$rdf = Class::OWL->new_model() unless $rdf;
-	$uri = $rdf->new_bnode() unless $uri;
-	return Class::OWL->new_instance($rdf,$self->_type => $uri,@_);
-}
-
-sub accessor {
-	my ($mop,$o,$a,$v) = @_;
-	
-	my $attr = $mop->find_attribute_by_name('$'.$a);
-	
-	unless ($attr) {
-		warn caller();
-		die "No such attribute $a on $o";
-	}
-	
-	if (defined $v) {
-		if ($v) {
-			$attr->set_value($o,$v);
-		} else {
-			$attr->clear_value($o);
-		}
-	}
-	$v = $attr->get_value($o);
-	
-	return undef unless defined $v;
-	
-	if (wantarray) {
-		return ref $v eq 'ARRAY' ? @$v : ($v);
-	} else {
-		return ref $v eq 'ARRAY' ? $v->[0] : $v;
-	}
-}
-
-package Class::OWL::Property;
-use base qw(Class::MOP::Attribute);
-use Data::Dumper;
-
-sub _resource {
-	$_[0]->{_resource};
-}
-
-sub _cardinality {
-	$_[0]->{_cardinality} = $_[1] if exists $_[1];
-	$_[0]->{_cardinality};
-}
-
-sub _domain {
-	$_[0]->{_domain} = $_[1] if exists $_[1];
-	$_[0]->{_domain};
-}
-
-sub _range {
-	$_[0]->{_range} = $_[1] if exists $_[1];
-	$_[0]->{_range};
-}
-
-sub single_valued {
-	$_[0]->max_cardinality == 1;
-}
-
-sub max_cardinality {
-	$_[0]->{_cardinality}->[1];
-}
-
-sub min_cardinality {
-	$_[0]->{_cardinality}->[0];
-}
-
-sub restrict {
-	my ($p,$property_data,$rdf) = @_;
-	$p->{_cardinality} = [0,undef] unless $p->{_cardinality};
-	if ($rdf->exists($p->{_resource},'rdf:type','owl:FunctionalProperty'))
-	{
-		$p->{_cardinality} = [0,1];
-	}
-	$p->{_cardinality} = [0,$property_data->{'owl:cardinality'}] 
-		if $property_data->{'owl:cardinality'};
-	$p->{_cardinality} = [$property_data->{'owl:minCardinality'},$property_data->{'owl:maxCardinality'}] 
-		if $property_data->{'owl:minCardinality'} || $property_data->{'owl:maxCardinality'};
-		
-	$p->{_domain} = $property_data->{'rdfs:domain'} 
-		if $property_data->{'rdfs:domain'};
-	$p->{_range} = $property_data->{'rdfs:range'} 
-		if $property_data->{'rdfs:range'};
-}
-
-sub _accessor_info {
-	my ($self,$name) = @_;
-	
-	return {
-		$name => sub { my ($o,$v) = @_; $o->meta->accessor($o,$name,$v) }
-	};
-}
-
-sub new {
-	my ( $class, $resource, $property_data, $rdf ) = @_;
-	
-	my $value = undef;
-	my $name = Class::OWL::_get_name($resource);
-	die "Malformed resource $resource" unless $name;
-	my $p = bless Class::MOP::Attribute->new(
-		'$'.$name => (
-			accessor => Class::OWL::Property->_accessor_info($name),
-			init_arg => ':' . $name,
-			default  => $value,
-		  )
-	), $class;
-	$p->{_resource} = $resource;
-	$p->restrict($property_data,$rdf);
-	
-	$p;
-}
-
 package Class::OWL;
+use Moose;
+our $VERSION = '0.07';
 
-use version; $VERSION = qv('0.0.6');
-
-use warnings;
-use strict;
 use Carp;
-
 use RDF::Helper;
-use Class::MOP;
-
-#use Class::OWL::MOP::Class;
-use Class::MOP::Attribute;
 
 use LWP::Simple qw(get);
-
 use XML::CommonNS qw(RDF RDFS OWL);
 
-use Data::Dumper;
+use Class::OWL::Meta::Class;
+use Class::OWL::Meta::Property;
 
+use Data::Dumper; 
 my %CONFIG = (
-	Namespaces => {
-		rdf  => "$RDF",
-		rdfs => "$RDFS",
-		owl  => "$OWL",
-	},
-	ExpandQNames => 1,
+    BaseInterface => 'RDF::Redland',
+    Namespaces    => {
+        rdf  => "$RDF",
+        rdfs => "$RDFS",
+        owl  => "$OWL",
+    },
+    ExpandQNames => 1,
 );
 
 my $DEBUG = 0;
@@ -180,18 +35,18 @@ sub import {
 		$CONFIG{Namespaces} =
 		  { %{ $CONFIG{Namespaces} }, %{ $opt{namespaces} }, };
 	}
-
+	
 	if ( $opt{url} ) {
 		$CONFIG{Namespaces}{'#default'} ||= $opt{url};
-		$class->parse_url( $opt{package} || __PACKAGE__, $opt{url} );
+		$class->new->parse_url( $opt{package} || __PACKAGE__, $opt{url} );
 	}
 
 	if ( $opt{file} ) {
-		$class->parse_url( $opt{package} || __PACKAGE__, $opt{file} );
+		$class->new->parse_url( $opt{package} || __PACKAGE__, $opt{file} );
 	}
 	
 	if ( $opt{owl} ) {
-		$class->parse_rdfxml($opt{package} || __PACKAGE__,$opt{owl});
+		$class->new->parse_rdfxml($opt{package} || __PACKAGE__,$opt{owl});
 	}
 }
 
@@ -210,7 +65,7 @@ sub _assert_triple {
 	}
 }
 
-sub to_rdf($) {
+sub to_rdf {
 	my ( $self, $i, $rdf ) = @_;
 	$rdf = $self->new_model() unless $rdf;
 	foreach my $t (@{$i->_type()}) {
@@ -250,20 +105,20 @@ sub from_rdf {
 	my $m = $o->meta;
 	
 	foreach my $stmt ($rdf->get_statements($subject)) {
-		next if $stmt->[1]->as_string eq 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
-		my $p = Class::OWL->owl_property($stmt->[1]);
-		die "Unknown property type "._r_name($stmt->[1]) unless $p;
+		next if $stmt->predicate->as_string eq 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+		my $p = Class::OWL->owl_property($stmt->predicate);
+		die "Unknown property type "._r_name($stmt->predicate) unless $p;
 		my $attr = $m->find_attribute_by_name($p->name);
 		die "Unknown attribute ".$p->name unless $attr;
 		
 		my $value;
-		if ($stmt->[2]->is_literal)
+		if ($stmt->object->is_literal)
 		{
-			$value = $stmt->[2]->literal_value;
+			$value = $stmt->object->literal_value;
 		}
 		else
 		{
-			$value = $self->from_rdf($stmt->[2],$rdf);
+			$value = $self->from_rdf($stmt->object,$rdf);
 		}
 		
 		CASE: {
@@ -285,8 +140,11 @@ sub from_rdf {
 our %class;
 our %attribute;
 
+sub _new_resource { RDF::Helper::Node::Resource->new( uri => shift ) }
+
+
 sub _r_name {
-    my $r = ref $_[0] ? $_[0] : RDF::Helper->new_resource($_[0]);
+    my $r = ref $_[0] ? $_[0] : _new_resource($_[0]);
     $r->is_blank ? $r->blank_identifier : $r->uri->as_string;
 }
 
@@ -336,7 +194,7 @@ sub _for_type {
 	my ( $rdf, $type, $sub) = @_;
 	if ( $rdf->exists( undef, undef, $type ) ) {
 		for my $s ( $rdf->get_statements(undef, 'rdf:type', $type ) ) {
-			$sub->( $s->[0], $rdf->property_hash($s->[0]), $rdf );
+			$sub->( $s->subject, $rdf->property_hash($s->subject), $rdf );
 		}
 	}
 }
@@ -344,7 +202,7 @@ sub _for_type {
 sub _for_statements {
 	my ( $rdf, $subject, $predicate, $sub ) = @_;
 	foreach my $stmt ( $rdf->get_statements( $subject, $predicate ) ) {
-		$sub->( $rdf, $stmt->[2] );
+		$sub->( $rdf, $stmt->object );
 	}
 }
 
@@ -360,12 +218,12 @@ sub parse_rdfxml {
 
 	my $rdf = $self->new_model();
 	$rdf->include_rdfxml( xml => $rdfxml );
-	#print $rdf->serialize( filename => '/tmp/model.n3', format => 'ntriples' );
 	if ( $rdf->exists( undef, 'rdf:type', 'owl:Class' ) ) {
-		_parse_classes($package,$rdf);			
+		_parse_classes($package,$rdf);
 		_parse_properties($package,$rdf);
 		_parse_inheritance($package,$rdf);
 	}
+
 }
 
 sub _get_name { return ( $_[0] =~ /[#\/]([^#\/]+)$/ )[0] }
@@ -393,7 +251,7 @@ sub _parse_properties {
 sub _create_property {
 	my ( $resource, $property_data, $rdf ) = @_;
 	
-	my $property = Class::OWL::Property->new(_r_name($resource),$property_data,$rdf);
+	my $property = Class::OWL::Meta::Property->new(_r_name($resource),$property_data,$rdf);
 	Class::OWL->owl_property( $resource, $property );
 	debug "Created property "
 		  . $property->_resource . " as "
@@ -414,10 +272,9 @@ sub _create_property {
 
 sub _parse_classes {
 	my ($package,$rdf) = @_;
-	
+
 	# create Thing
-	_create_class('Class::OWL',RDF::Helper->new_resource('http://www.w3.org/2002/07/owl#Thing'));
-	
+	_create_class('Class::OWL',$rdf->new_resource('http://www.w3.org/2002/07/owl#Thing'));
 	# create All other classes
 	_for_type(
 		$rdf,
@@ -448,11 +305,11 @@ sub _create_class {
 	my $class;
 
 	if ($name) {
-		$class = Class::OWL::MOP->create($name);
+		$class = Class::OWL::Meta::Class->create($name);
 		$class->name();
 	}
 	else {
-		$class = Class::OWL::MOP->create_anon_class;
+		$class = Class::OWL::Meta::Class->create_anon_class;
 		$name  = $class->name;
 	}
 	
@@ -519,12 +376,12 @@ sub _unwrap_list {
 	
 	foreach my $s ($rdf->get_statements($i,'http://www.w3.org/1999/02/22-rdf-syntax-ns#first'))
 	{
-		push(@{$lst},$s->[2]);
+		push(@{$lst},$s->object);
 	}
 	
 	foreach my $s ($rdf->get_statements($i,'http://www.w3.org/1999/02/22-rdf-syntax-ns#rest'))
 	{	
-		_unwrap_list($rdf,$lst,$s->[2]);
+		_unwrap_list($rdf,$lst, $s->object);
 	}
 		
 	return $lst;
