@@ -13,7 +13,7 @@ use Class::OWL::Meta::Property;
 
 use Data::Dumper; 
 my %CONFIG = (
-    BaseInterface => 'RDF::Redland',
+#    BaseInterface => 'RDF::Redland',
     Namespaces    => {
         rdf  => "$RDF",
         rdfs => "$RDFS",
