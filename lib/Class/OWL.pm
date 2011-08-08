@@ -13,7 +13,6 @@ use Class::OWL::Meta::Property;
 
 use Data::Dumper; 
 my %CONFIG = (
-#    BaseInterface => 'RDF::Redland',
     Namespaces    => {
         rdf  => "$RDF",
         rdfs => "$RDFS",
@@ -71,7 +70,7 @@ sub to_rdf {
 	foreach my $t (@{$i->_type()}) {
 		$rdf->assert_resource( $i->_resource, 'rdf:type', $t );
 	}
-	foreach my $attr ( $i->meta->compute_all_applicable_attributes() ) {
+	foreach my $attr ( $i->meta->get_all_attributes() ) {
 		next if $attr->name eq '$_resource' || $attr->name eq '$_model' || $attr->name eq '$_type';
 		next unless $attr->has_value($i);
 		_assert_triple($rdf,$i->_resource,$attr->_resource,$attr->get_value($i));
